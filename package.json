@@ -1,0 +1,12 @@
+{
+  "name": "alice",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+  },
+  "devDependencies": {},
+  "scripts": {},
+  "author": "Florian Tölle",
+  "license": "ISC"
+}
