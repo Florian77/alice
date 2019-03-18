@@ -8,5 +8,13 @@
   "devDependencies": {},
   "scripts": {},
   "author": "Florian Tölle",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Florian77/alice.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Florian77/alice/issues"
+  },
+  "homepage": "https://github.com/Florian77/alice#readme"
 }

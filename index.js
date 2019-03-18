@@ -1,5 +1,10 @@
 
 
+function getStage(){
+    return process.env['ALICE_STAGE'];
+}
+module.exports.getStage = getStage;
+
 let connection = {
     mongoDb: {},
     dynamoDbDocClient: {}
@@ -7,15 +12,6 @@ let connection = {
 
 function mongoDb(name = 'DEFAULT') {
     return connection.mongoDb[name].db(process.env[`ALICE_MONGODB_${name}_DB`]);
-/*    return new Promise( async (resolve, reject) => {
-        try {
-            const db = (await mongoDbConnection(name)).db(process.env[`ALICE_MONGODB_${name}_DB`]);
-            resolve(db);
-        }
-        catch (e) {
-            reject(e);
-        }
-    });*/
 }
 module.exports.mongoDb = mongoDb;
 
@@ -56,9 +52,6 @@ function dynamoDbDocClient(name = 'DEFAULT') {
 module.exports.dynamoDbDocClient = dynamoDbDocClient;
 
 
-function getStage(){
-
-}
 
 
 function cleanUp() {
