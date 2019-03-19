@@ -13,14 +13,22 @@ module.exports.getStage = getStage;
 // ----------------------------------------------------------
 //  DEBUG Output: ON / OFF
 // ----------------------------------------------------------
-let debug = false;
+let debug = String(process.env['ALICE_DEBUG']).toLowerCase() === 'true' || false;
 
-const debugOn = () => debug = true;
+const setDebugOn = () => debug = true;
+module.exports.setDebugOn = setDebugOn;
+module.exports.debug = debug;
+
+const debugOn = () => debug === true;
 module.exports.debugOn = debugOn;
 
-const debugOff = () => debug = false;
+const setDebugOff = () => debug = false;
+module.exports.setDebugOff = setDebugOff;
+
+const debugOff = () => debug === false;
 module.exports.debugOff = debugOff;
 
+if(debugOn()) ftDev.logJsonString(debug, 'ENV::ALICE_DEBUG =');
 
 // ----------------------------------------------------------
 //  DB Connection Pool
@@ -45,7 +53,7 @@ const mongoDbConnection = async (name = 'DEFAULT') => {
             connection.mongoDb[name] = new (require('mongodb').MongoClient)(process.env[`ALICE_MONGODB_${name}_URL`], {useNewUrlParser: true});
             try {
                 await connection.mongoDb[name].connect();
-                if(debug) ftDev.log(`Alice: connection.mongoDb[${name}].connect()`);
+                if(debugOn()) ftDev.log(`Alice: connection.mongoDb[${name}].connect()`);
             }
             catch (e) {
                 connection.mongoDb[name] = false;
@@ -87,7 +95,7 @@ const cleanUp = () => {
     for (let key in connection.mongoDb) {
         if(connection.mongoDb[key]) {
             try {
-                if(debug) ftDev.log(`Alice: connection.mongoDb[${key}].close()`);
+                if(debugOn()) ftDev.log(`Alice: connection.mongoDb[${key}].close()`);
                 connection.mongoDb[key].close();
                 connection.mongoDb[key] = false;
             }
@@ -148,7 +156,7 @@ const importCsv = async (taskList) => {
                 ;
 
                 logName = collectionName + ':' + scope;
-                if(debug) ftDev.logJsonString(scopeFilter, `scopeFilter:${logName}`);
+                if(debugOn()) ftDev.logJsonString(scopeFilter, `scopeFilter:${logName}`);
 
 
                 let importData = await csv(csvOptions)
@@ -157,18 +165,18 @@ const importCsv = async (taskList) => {
                     )
                 ;
                 counter.download = importData.length;
-                if(debug) ftDev.log(url, 'rows:', counter.download);
+                if(debugOn()) ftDev.log(url, 'rows:', counter.download);
 
                 if (importData.length > 0) {
-                    if(debug) ftDev.log('start import:', scope);
+                    if(debugOn()) ftDev.log('start import:', scope);
                     const collection = await mongoDb().collection(collectionName);
 
                     counter.befor = await collection.countDocuments(scopeFilter);
-                    if(debug) ftDev.log('count', logName, ':', counter.befor);
+                    if(debugOn()) ftDev.log('count', logName, ':', counter.befor);
 
                     const resultDelete = await collection.deleteMany(scopeFilter);
                     counter.delete = resultDelete.result.n;
-                    if(debug) ftDev.mongo.logDeleteMany(resultDelete, logName);
+                    if(debugOn()) ftDev.mongo.logDeleteMany(resultDelete, logName);
 
                     if (mapData) {
                         importData = importData.map(mapData(scope));
@@ -176,13 +184,13 @@ const importCsv = async (taskList) => {
 
                     const resultInsert = await collection.insertMany(importData);
                     counter.insert = resultInsert.result.n;
-                    if(debug) ftDev.mongo.logInsertMany(resultInsert, logName);
+                    if(debugOn()) ftDev.mongo.logInsertMany(resultInsert, logName);
                 } else {
                     const msg = `empty download result [${url}]`;
                     return reject(`error:${logName}:[${msg}]`);
                 }
             } catch (e) {
-                if(debug) ftDev.error(e.message);
+                if(debugOn()) ftDev.error(e.message);
                 reject(`error:${logName}:[${e.message}]`);
             }
             resolve('success:' + logName + ':' + JSON.stringify(counter));
@@ -223,7 +231,7 @@ const importXml = async (taskList) => {
                 ;
 
                 logName = collectionName + ':' + scope;
-                if(debug) ftDev.logJsonString(scopeFilter, `scopeFilter:${logName}`);
+                if(debugOn()) ftDev.logJsonString(scopeFilter, `scopeFilter:${logName}`);
 
                 let importData = await parseString(
                     await request(url),
@@ -234,18 +242,18 @@ const importXml = async (taskList) => {
                 importData = wrapArray(importData.rows.row); // TODO: dynamic row path extraction: use rowPath var
 
                 counter.download = importData.length;
-                if(debug) ftDev.log(url, 'rows:', counter.download);
+                if(debugOn()) ftDev.log(url, 'rows:', counter.download);
 
                 if (importData.length > 0) {
-                    if(debug) ftDev.log('start import:', scope);
+                    if(debugOn()) ftDev.log('start import:', scope);
                     const collection = await mongoDb().collection(collectionName);
 
                     counter.befor = await collection.countDocuments(scopeFilter);
-                    if(debug) ftDev.log('count', logName, ':', counter.befor);
+                    if(debugOn()) ftDev.log('count', logName, ':', counter.befor);
 
                     const resultDelete = await collection.deleteMany(scopeFilter);
                     counter.delete = resultDelete.result.n;
-                    if(debug) ftDev.mongo.logDeleteMany(resultDelete, logName);
+                    if(debugOn()) ftDev.mongo.logDeleteMany(resultDelete, logName);
 
                     if (mapData) {
                         importData = importData.map(mapData(scope));
@@ -253,19 +261,20 @@ const importXml = async (taskList) => {
 
                     const resultInsert = await collection.insertMany(importData);
                     counter.insert = resultInsert.result.n;
-                    if(debug) ftDev.mongo.logInsertMany(resultInsert, logName);
+                    if(debugOn()) ftDev.mongo.logInsertMany(resultInsert, logName);
                 } else {
                     const msg = `empty download result [${url}]`;
                     return reject(`error:${logName}:[${msg}]`);
                 }
             } catch (e) {
-                if(debug) ftDev.error(e.message);
+                if(debugOn()) ftDev.error(e.message);
                 reject(`error:${logName}:[${e.message}]`);
             }
             resolve('success:' + logName + ':' + JSON.stringify(counter));
         });
     }));
 };
+module.exports.importXml = importXml;
 
 
 // ----------------------------------------------------------
