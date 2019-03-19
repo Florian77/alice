@@ -6,7 +6,10 @@
   "dependencies": {
     "csvtojson": "^2.0.8",
     "ftws-node-dev-tools": "github:Florian77/node-dev-tools",
-    "request": "^2.88.0"
+    "request": "^2.88.0",
+    "request-promise-native": "^1.0.7",
+    "wrap-array": "^1.0.0",
+    "xml2js": "^0.4.19"
   },
   "devDependencies": {},
   "scripts": {},

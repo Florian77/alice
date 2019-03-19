@@ -1,22 +1,39 @@
 const ftDev = require('ftws-node-dev-tools');
 
+
+// ----------------------------------------------------------
+//  Get Stage from ENV
+// ----------------------------------------------------------
 function getStage(){
     return process.env['ALICE_STAGE'];
 }
 module.exports.getStage = getStage;
 
+
+// ----------------------------------------------------------
+//  DEBUG Output: ON / OFF
+// ----------------------------------------------------------
+let debug = false;
+
+const debugOn = () => debug = true;
+module.exports.debugOn = debugOn;
+
+const debugOff = () => debug = false;
+module.exports.debugOff = debugOff;
+
+
+// ----------------------------------------------------------
+//  DB Connection Pool
+// ----------------------------------------------------------
 let connection = {
     mongoDb: {},
     dynamoDbDocClient: {}
 };
 
-let debug = false;
 
-const debugOn = () => debug = true;
-module.exports.debugOn = debugOn;
-const debugOff = () => debug = false;
-module.exports.debugOff = debugOff;
-
+// ----------------------------------------------------------
+//  Mongo DB Connection
+// ----------------------------------------------------------
 const mongoDb = (name = 'DEFAULT') => {
     return connection.mongoDb[name].db(process.env[`ALICE_MONGODB_${name}_DB`]);
 };
@@ -41,6 +58,9 @@ const mongoDbConnection = async (name = 'DEFAULT') => {
 module.exports.mongoDbConnection = mongoDbConnection;
 
 
+// ----------------------------------------------------------
+//  AWS -> dynamoDb -> DocClient
+// ----------------------------------------------------------
 const dynamoDbDocClient = (name = 'DEFAULT') => {
 
     if(!connection.dynamoDbDocClient[name]) {
@@ -59,6 +79,9 @@ const dynamoDbDocClient = (name = 'DEFAULT') => {
 module.exports.dynamoDbDocClient = dynamoDbDocClient;
 
 
+// ----------------------------------------------------------
+//  Cleanup
+// ----------------------------------------------------------
 const cleanUp = () => {
     // Close all MongoDB connections
     for (let key in connection.mongoDb) {
@@ -76,6 +99,10 @@ const cleanUp = () => {
 };
 module.exports.cleanUp = cleanUp;
 
+
+// ----------------------------------------------------------
+//  Return formats
+// ----------------------------------------------------------
 const cleanReturn = (body, statusCode = 200, header = false) => {
     cleanUp();
     return {
@@ -90,7 +117,9 @@ const cleanReturnStringify = (body, statusCode = 200, header = false) => {
 };
 module.exports.cleanReturnStringify = cleanReturnStringify;
 
-
+// ----------------------------------------------------------
+//  import CSV
+// ----------------------------------------------------------
 const importCsv = async (taskList) => {
     return Promise.all(taskList.map(taskItem => {
         return new Promise(async (resolve, reject) => {
@@ -104,6 +133,7 @@ const importCsv = async (taskList) => {
             try {
                 const request = require('request');
                 const csv = require('csvtojson');
+                const wrapArray = require('wrap-array');
 
                 const {
                     url,
@@ -161,13 +191,95 @@ const importCsv = async (taskList) => {
 };
 module.exports.importCsv = importCsv;
 
-const importXML = () => {};
 
-const taskStart = () => {};
+// ----------------------------------------------------------
+//  import XML
+// ----------------------------------------------------------
+const importXml = async (taskList) => {
+    return Promise.all(taskList.map(taskItem => {
+        return new Promise(async (resolve, reject) => {
+            let logName;
+            const counter = {
+                befor: 0,
+                delete: 0,
+                insert: 0,
+                download: 0
+            };
+            try {
+                const wrapArray = require('wrap-array');
+                const request = require('request-promise-native');
+                const parseString = require('util').promisify(require('xml2js').parseString);
 
-const taskError = () => {};
+                const {
+                    url,
+                    collectionName,
+                    scope,
+                    mapData,
+                    rowPath
+                } = taskItem;
+                const scopeFilter = (taskItem.scopeFilter && typeof taskItem.scopeFilter === "function")
+                    ? taskItem.scopeFilter(scope)
+                    : taskItem.scopeFilter
+                ;
 
-const taskFinished = () => {};
+                logName = collectionName + ':' + scope;
+                if(debug) ftDev.logJsonString(scopeFilter, `scopeFilter:${logName}`);
 
+                let importData = await parseString(
+                    await request(url),
+                    {
+                        explicitArray: false
+                    }
+                );
+                importData = wrapArray(importData.rows.row); // TODO: dynamic row path extraction: use rowPath var
+
+                counter.download = importData.length;
+                if(debug) ftDev.log(url, 'rows:', counter.download);
+
+                if (importData.length > 0) {
+                    if(debug) ftDev.log('start import:', scope);
+                    const collection = await mongoDb().collection(collectionName);
+
+                    counter.befor = await collection.countDocuments(scopeFilter);
+                    if(debug) ftDev.log('count', logName, ':', counter.befor);
+
+                    const resultDelete = await collection.deleteMany(scopeFilter);
+                    counter.delete = resultDelete.result.n;
+                    if(debug) ftDev.mongo.logDeleteMany(resultDelete, logName);
+
+                    if (mapData) {
+                        importData = importData.map(mapData(scope));
+                    }
+
+                    const resultInsert = await collection.insertMany(importData);
+                    counter.insert = resultInsert.result.n;
+                    if(debug) ftDev.mongo.logInsertMany(resultInsert, logName);
+                } else {
+                    const msg = `empty download result [${url}]`;
+                    return reject(`error:${logName}:[${msg}]`);
+                }
+            } catch (e) {
+                if(debug) ftDev.error(e.message);
+                reject(`error:${logName}:[${e.message}]`);
+            }
+            resolve('success:' + logName + ':' + JSON.stringify(counter));
+        });
+    }));
+};
+
+
+// ----------------------------------------------------------
+//  Easy Task log
+// ----------------------------------------------------------
+const logTaskStart = () => {};
+
+const logTaskError = () => {};
+
+const logTaskFinished = () => {};
+
+
+// ----------------------------------------------------------
+//  import Ebay Items
+// ----------------------------------------------------------
 const importEbay = () => {};
 
