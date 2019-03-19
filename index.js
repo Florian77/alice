@@ -1,4 +1,4 @@
-
+const ftDev = require('ftws-node-dev-tools');
 
 function getStage(){
     return process.env['ALICE_STAGE'];
@@ -10,18 +10,25 @@ let connection = {
     dynamoDbDocClient: {}
 };
 
-function mongoDb(name = 'DEFAULT') {
+let debug = false;
+
+const debugOn = () => debug = true;
+module.exports.debugOn = debugOn;
+const debugOff = () => debug = false;
+module.exports.debugOff = debugOff;
+
+const mongoDb = (name = 'DEFAULT') => {
     return connection.mongoDb[name].db(process.env[`ALICE_MONGODB_${name}_DB`]);
-}
+};
 module.exports.mongoDb = mongoDb;
 
-async function mongoDbConnection(name = 'DEFAULT') {
+const mongoDbConnection = async (name = 'DEFAULT') => {
     return new Promise( async (resolve, reject) => {
         if(!connection.mongoDb[name]) {
             connection.mongoDb[name] = new (require('mongodb').MongoClient)(process.env[`ALICE_MONGODB_${name}_URL`], {useNewUrlParser: true});
             try {
                 await connection.mongoDb[name].connect();
-                // console.log(`Alice: connection.mongoDb[${name}].connect()`);
+                if(debug) ftDev.log(`Alice: connection.mongoDb[${name}].connect()`);
             }
             catch (e) {
                 connection.mongoDb[name] = false;
@@ -30,11 +37,11 @@ async function mongoDbConnection(name = 'DEFAULT') {
         }
         resolve(connection.mongoDb[name]);
     });
-}
+};
 module.exports.mongoDbConnection = mongoDbConnection;
 
 
-function dynamoDbDocClient(name = 'DEFAULT') {
+const dynamoDbDocClient = (name = 'DEFAULT') => {
 
     if(!connection.dynamoDbDocClient[name]) {
 
@@ -48,18 +55,16 @@ function dynamoDbDocClient(name = 'DEFAULT') {
     }
 
     return connection.dynamoDbDocClient[name];
-}
+};
 module.exports.dynamoDbDocClient = dynamoDbDocClient;
 
 
-
-
-function cleanUp() {
+const cleanUp = () => {
     // Close all MongoDB connections
     for (let key in connection.mongoDb) {
         if(connection.mongoDb[key]) {
             try {
-                // console.log(`Alice: connection.mongoDb[${key}].close()`);
+                if(debug) ftDev.log(`Alice: connection.mongoDb[${key}].close()`);
                 connection.mongoDb[key].close();
                 connection.mongoDb[key] = false;
             }
@@ -68,38 +73,101 @@ function cleanUp() {
             }
         }
     }
-}
+};
 module.exports.cleanUp = cleanUp;
 
-function cleanReturn(body, statusCode = 200, header = false) {
+const cleanReturn = (body, statusCode = 200, header = false) => {
     cleanUp();
     return {
         statusCode,
         body,
     };
-}
+};
 module.exports.cleanReturn = cleanReturn;
 
-function cleanReturnStringify(body, statusCode = 200, header = false) {
+const cleanReturnStringify = (body, statusCode = 200, header = false) => {
     return cleanReturn(JSON.stringify(body), statusCode, header);
-}
+};
 module.exports.cleanReturnStringify = cleanReturnStringify;
 
-function taskStart() {
 
-}
-function taskError() {
+const importCsv = async (taskList) => {
+    return Promise.all(taskList.map(taskItem => {
+        return new Promise(async (resolve, reject) => {
+            let logName;
+            const counter = {
+                befor: 0,
+                delete: 0,
+                insert: 0,
+                download: 0
+            };
+            try {
+                const request = require('request');
+                const csv = require('csvtojson');
 
-}
+                const {
+                    url,
+                    collectionName,
+                    scope,
+                    mapData,
+                    csvOptions
+                } = taskItem;
+                const scopeFilter = (taskItem.scopeFilter && typeof taskItem.scopeFilter === "function")
+                    ? taskItem.scopeFilter(scope)
+                    : taskItem.scopeFilter
+                ;
 
-function taskFinished() {
+                logName = collectionName + ':' + scope;
+                if(debug) ftDev.logJsonString(scopeFilter, `scopeFilter:${logName}`);
 
-}
 
-function importCsv() {
+                let importData = await csv(csvOptions)
+                    .fromStream(
+                        request.get(url)
+                    )
+                ;
+                counter.download = importData.length;
+                if(debug) ftDev.log(url, 'rows:', counter.download);
 
-}
-function importEbay() {
+                if (importData.length > 0) {
+                    if(debug) ftDev.log('start import:', scope);
+                    const collection = await mongoDb().collection(collectionName);
 
-}
+                    counter.befor = await collection.countDocuments(scopeFilter);
+                    if(debug) ftDev.log('count', logName, ':', counter.befor);
+
+                    const resultDelete = await collection.deleteMany(scopeFilter);
+                    counter.delete = resultDelete.result.n;
+                    if(debug) ftDev.mongo.logDeleteMany(resultDelete, logName);
+
+                    if (mapData) {
+                        importData = importData.map(mapData(scope));
+                    }
+
+                    const resultInsert = await collection.insertMany(importData);
+                    counter.insert = resultInsert.result.n;
+                    if(debug) ftDev.mongo.logInsertMany(resultInsert, logName);
+                } else {
+                    const msg = `empty download result [${url}]`;
+                    return reject(`error:${logName}:[${msg}]`);
+                }
+            } catch (e) {
+                if(debug) ftDev.error(e.message);
+                reject(`error:${logName}:[${e.message}]`);
+            }
+            resolve('success:' + logName + ':' + JSON.stringify(counter));
+        });
+    }));
+};
+module.exports.importCsv = importCsv;
+
+const importXML = () => {};
+
+const taskStart = () => {};
+
+const taskError = () => {};
+
+const taskFinished = () => {};
+
+const importEbay = () => {};
 

@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "csvtojson": "^2.0.8",
+    "ftws-node-dev-tools": "github:Florian77/node-dev-tools",
+    "request": "^2.88.0"
   },
   "devDependencies": {},
   "scripts": {},
