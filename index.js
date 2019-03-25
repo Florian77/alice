@@ -86,6 +86,10 @@ const dynamoDbDocClient = (name = 'DEFAULT') => {
 };
 module.exports.dynamoDbDocClient = dynamoDbDocClient;
 
+// TODO:D-DB  Wrapper für Table Config
+
+// TODO: AWS S3 Client
+
 
 // ----------------------------------------------------------
 //  Cleanup
@@ -111,19 +115,41 @@ module.exports.cleanUp = cleanUp;
 // ----------------------------------------------------------
 //  Return formats
 // ----------------------------------------------------------
-const cleanReturn = (body, statusCode = 200, header = false) => {
+const cleanReturn = (body, statusCode = 200, headers = {}) => {
     cleanUp();
+    /*if(headers){
+        return {
+            statusCode,
+            body,
+            headers
+        };
+    }*/
+
     return {
         statusCode,
         body,
+        headers
     };
 };
 module.exports.cleanReturn = cleanReturn;
 
-const cleanReturnStringify = (body, statusCode = 200, header = false) => {
-    return cleanReturn(JSON.stringify(body), statusCode, header);
+const cleanReturnJson = (body, statusCode = 200, headers = {}) => {
+    return cleanReturn(JSON.stringify(body), statusCode, headers);
 };
-module.exports.cleanReturnStringify = cleanReturnStringify;
+// Depricated !!!
+module.exports.cleanReturnStringify = cleanReturnJson;
+// New Name
+module.exports.cleanReturnJson = cleanReturnJson;
+
+
+const cleanReturnHtml = (body, statusCode = 200, headers = {}) => {
+    // TODO: Merge headers object
+    return cleanReturn(body, statusCode, {
+        'Content-Type': 'text/html',
+    });
+};
+module.exports.cleanReturnHtml = cleanReturnHtml;
+
 
 // ----------------------------------------------------------
 //  import CSV
@@ -175,7 +201,7 @@ const importCsv = async (taskList) => {
                     if(debugOn()) ftDev.log('count', logName, ':', counter.befor);
 
                     const resultDelete = await collection.deleteMany(scopeFilter);
-                    counter.delete = resultDelete.result.n;
+                    counter.delete = resultDelete.deletedCount;
                     if(debugOn()) ftDev.mongo.logDeleteMany(resultDelete, logName);
 
                     if (mapData) {
@@ -183,7 +209,7 @@ const importCsv = async (taskList) => {
                     }
 
                     const resultInsert = await collection.insertMany(importData);
-                    counter.insert = resultInsert.result.n;
+                    counter.insert = resultInsert.insertedCount;
                     if(debugOn()) ftDev.mongo.logInsertMany(resultInsert, logName);
                 } else {
                     const msg = `empty download result [${url}]`;
@@ -252,7 +278,7 @@ const importXml = async (taskList) => {
                     if(debugOn()) ftDev.log('count', logName, ':', counter.befor);
 
                     const resultDelete = await collection.deleteMany(scopeFilter);
-                    counter.delete = resultDelete.result.n;
+                    counter.delete = resultDelete.deletedCount;
                     if(debugOn()) ftDev.mongo.logDeleteMany(resultDelete, logName);
 
                     if (mapData) {
@@ -260,7 +286,7 @@ const importXml = async (taskList) => {
                     }
 
                     const resultInsert = await collection.insertMany(importData);
-                    counter.insert = resultInsert.result.n;
+                    counter.insert = resultInsert.insertedCount;
                     if(debugOn()) ftDev.mongo.logInsertMany(resultInsert, logName);
                 } else {
                     const msg = `empty download result [${url}]`;
@@ -292,3 +318,4 @@ const logTaskFinished = () => {};
 // ----------------------------------------------------------
 const importEbay = () => {};
 
+// -> Ebay Export
